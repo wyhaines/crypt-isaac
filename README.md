@@ -4,9 +4,11 @@ ISAAC is a cryptographically secure PRNG for generating high quality random numb
 
 http://burtleburtle.net/bob/rand/isaac.html
 
-This is a pure Ruby implementation of the algorithm.  It is reasonably fast for a pure Ruby implementation.  On an 800Mhz PIII computer running Ruby 1.8.2, and while the machine is also serving as general desktop, the library seems to consistently generate between 15000 and 16000 random numbers per second.
+This is a pure Ruby implementation of the algorithm, but it is reasonably fast.
 
-Ruby uses the Mersenne Twister as its PRNG, and while this the Twister is a fast PRNG that produces highly random numbers, it is not strong for cryptographic purposes, nor is it suitable when one needs multiple independent streams of random numbers.  Crypt::ISAAC is suitable for either purpose.
+When originally written, running on Ruby 1.8.2 under a venerable 800Mhz PIII Linux system, it could do 15000 to 16000 numbers per second. On Ruby 2.2.3, running on a basic Digital Ocean VM, it can generate close to 800000 random integers per second.
+
+Ruby uses the Mersenne Twister as its PRNG, and while this algorithm is a fast PRNG that produces highly random numbers, it is not strong for cryptographic purposes, nor is it suitable when one needs multiple independent streams of random numbers.  Crypt::ISAAC is suitable for either purpose.
 
 ## Installation
 
@@ -46,7 +48,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/crypt-isaac. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/wyhaines/crypt-isaac. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
 
 ## License
 
