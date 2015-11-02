@@ -20,47 +20,89 @@ module Crypt
     # the system will fall back to a simplistic initialization mechanism
     # using the builtin Mersenne Twister PRNG.
 
-    def initialize(noblock = true)
+    def initialize(seed = true)
       @mm = []
-      @randrsl = []
-      # Best initialization of the generator would be by pulling
-      # numbers from /dev/random.
-      rnd_source = noblock ? '/dev/urandom' : '/dev/random'
-      if (FileTest.exist? rnd_source)
-        File.open(rnd_source,'r') do |r|
-          256.times do |t|
-            z = r.read(4)
-            x = z.unpack('V')[0]
-            @randrsl[t] = x
-          end
-        end
+
+      if Integer === seed || Random === seed
+        self.srand(seed)
       else
-        # If urandom isn't available, the standard Ruby PRNG makes an
-        # adequate fallback.
-        256.times do |t|
-          @randrsl[t] = Kernel.rand(4294967295)
+        @seed = seed
+        rnd_source = ( ( seed == true ) || ( seed == false ) ) ?
+          ( seed ? '/dev/urandom' : '/dev/random' ) :
+          seed
+        if (FileTest.exist? rnd_source)
+          @randrsl = []
+          File.open(rnd_source,'r') do |r|
+            256.times do |t|
+              z = r.read(4)
+              x = z.unpack('V')[0]
+              @randrsl[t] = x
+            end
+          end
+          randinit(true)
+        else
+          raise "Entropy source (#{rnd_source}) doesn't exist. The ISAAC algorithm can not be seeded."
         end
       end
+    end
+
+    # If seeded with an integer, use that to seed a standard Ruby Mersenne Twister
+    # PRNG, and then use that to generate seed value for ISAAC. This is mostly useful
+    # for producing repeated, deterministic results, which may be needed for testing.
+    def srand(seed)
+      @seed = seed
+      @randrsl = []
+      seed_prng = ( Random === seed ) ? seed : Random.new(seed)
+      256.times do |t|
+        @randrsl[t] = seed_prng.rand(4294967295)
+      end
       randinit(true)
-      nil
     end
 
     # Works just like the standard rand() function.  If called with an
     # integer argument, rand() will return positive random number in
     # the range of 0 to (argument - 1).  If called without an integer
     # argument, rand() returns a positive floating point number less than 1.
+    # If called with a Range, returns a number that is in the range.
   
-    def rand(*num)
+    def rand(arg = nil)
       if (@randcnt == 1)
         isaac
         @randcnt = 256
       end
       @randcnt -= 1
-      if num[0].to_i > 0
-        @randrsl[@randcnt].modulo(num[0])
+      if arg.nil?
+        ( @randrsl[@randcnt] / 536870912.0 ) % 1
+      elsif Integer === arg || Float === arg
+        @randrsl[@randcnt] % arg
+      elsif Range === arg
+        arg.min + @randrsl[@randcnt] % (arg.max - arg.min)
       else
-        ".#{@randrsl[@randcnt]}".to_f
+        @randrsl[@randcnt] % Integer(arg)
       end
+    end
+
+    def seed
+      Random === @seed ? @seed.seed : @seed
+    end
+
+    def state
+      @randrsl + [@randcnt]
+    end
+
+    def ==(gen)
+      self.state == gen.state
+    end
+
+    def bytes(size)
+      buffer = ""
+      ( size / 4 ).times { buffer << [rand(4294967295)].pack("L").unpack("aaaa").join }
+
+      if size % 4 != 0
+        buffer << [rand(4294967295)].pack("L").unpack("aaaa")[0..(size % 4 - 1)].join
+      end
+
+      buffer
     end
 
     def isaac

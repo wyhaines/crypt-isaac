@@ -6,9 +6,9 @@ http://burtleburtle.net/bob/rand/isaac.html
 
 This is a pure Ruby implementation of the algorithm, but it is reasonably fast.
 
-When originally written, running on Ruby 1.8.2 under a venerable 800Mhz PIII Linux system, it could do 15000 to 16000 numbers per second. On Ruby 2.2.3, running on a basic Digital Ocean VM, it can generate close to 800000 random integers per second.
+When originally written, running on Ruby 1.8.2 under a venerable 800Mhz PIII Linux system, it could do 15000 to 16000 numbers per second. On Ruby 2.2.3, running on a basic Digital Ocean VM, it can generate almost a million random integers or floats per second.
 
-Ruby uses the Mersenne Twister as its PRNG, and while this algorithm is a fast PRNG that produces highly random numbers, it is not strong for cryptographic purposes, nor is it suitable when one needs multiple independent streams of random numbers.  Crypt::ISAAC is suitable for either purpose.
+Ruby uses the Mersenne Twister as its PRNG, and while this algorithm is a fast PRNG that produces highly random numbers with good stastical properties, it is not cryptographically strong. ISAAC is very fast, also has good statistical properties, and is cryptographically strong.
 
 ## Installation
 
