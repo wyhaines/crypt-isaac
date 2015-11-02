@@ -28,14 +28,20 @@ Or install it yourself as:
 
 ## Usage
 
+```ruby
 require 'crypt/isaac'
 
-rng = Crypt::ISAAC.new
+rng = Crypt::ISAAC.new # New ISAAC object, seeded using /dev/urandom or /dev/random, if available.
+rng = Crypt::ISAAC.new(17773845992) # New ISAAC object, seeded from a deterministic point.
 
-r1 = rng.rand() # returns a floating point between 0 and 1
+r1 = rng.rand() # returns a floating point number between 0 and 1
+r2 = rng.rand(10.57) # returns a floating point number between 0 and 10.57
 r2 = rnd.rand(1000) # returns an integer between 0 and 999
+r3 = rnd.rand(3..12) # returns an integer between 3 and 12
+noise = rng.bytes(1024) # return a 1k string of random bytes
+```
 
-rand() should work identically to the Kernel.rand().
+Crypt::ISAAC should provide the same API as the Ruby 2.2 version of Random.
 
 Enjoy it.  Let me know if you find anything that can be improved or that
 needs to be fixed.
