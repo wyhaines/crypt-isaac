@@ -2,12 +2,14 @@
 
 module Crypt
   class Xorshift64Star
+
     UINT32_C = 2**32
     UINT64_C = 2**64
     UINT64_Cf = UINT64_C.to_f
 
     def initialize( seed = new_seed )
       srand( seed )
+      @old_seed = @seed
     end
 
     def new_seed
@@ -18,6 +20,7 @@ module Crypt
     end
 
     def srand( seed = new_seed )
+      @old_seed = @seed
       @seed = seed % UINT64_C
     end
 
@@ -28,8 +31,17 @@ module Crypt
       if n < 1
         ( ( @seed * 2685821657736338717 ) % UINT64_C ) / UINT64_Cf
       else
-        ( ( @seed * 2685821657736338717 ) % UINT64_C ) % n
+        ( ( @seed * 2685821657736338717 ) % UINT64_C ) % Integer( n )
       end
     end
+
+    def seed
+      @old_seed
+    end
+
+    def ==(v)
+      self.class == v.class && @old_seed == v.seed
+    end
+
   end
 end

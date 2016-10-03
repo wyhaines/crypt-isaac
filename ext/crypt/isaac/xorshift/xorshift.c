@@ -28,7 +28,9 @@ static VALUE Xorshift64Star_initialize( VALUE self, VALUE args ) {
     _seed = rb_funcall( self, rb_intern( "srand" ), 1, rb_ary_entry( args, 0 ) );
   }
 
-  return rb_funcall( self, rb_intern( "srand" ), 1, _seed );
+  _seed = rb_funcall( self, rb_intern( "srand" ), 1, _seed );
+  rb_iv_set( self, "@old_seed", _seed );
+  return _seed;
 }
 
 static VALUE to_hex_block( VALUE arg, VALUE data, int argc, VALUE* argv ) {
@@ -60,11 +62,14 @@ static VALUE Xorshift64Star_srand( VALUE self, VALUE args ) {
 
   Data_Get_Struct( self, uint64_t, seed);
 
-  if ( len == 0 ) {
+  if ( ( len == 0 ) || ( ( len == 1 ) && ( rb_ary_entry( args, 0 ) == Qnil ) ) ) {
     _seed = rb_funcall( self, rb_intern( "new_seed" ), 0 );
   } else {
     _seed = rb_ary_entry( args, 0 );
   }
+
+  rb_iv_set( self, "@old_seed", ULL2NUM( (*seed) ) );
+
   (*seed) = NUM2ULL(_seed);
   return _seed;
 }
@@ -94,6 +99,14 @@ static VALUE Xorshift64Star_rand( VALUE self, VALUE args ) {
   }
 }
 
+static VALUE Xorshift64Star_seed(VALUE self) {
+  return rb_iv_get( self, "@old_seed" );
+}
+
+static VALUE Xorshift64Star_eq(VALUE self, VALUE v) {
+      return ( ( rb_obj_classname( self ) == rb_obj_classname( v ) ) && ( rb_iv_get( self, "@old_seed" ) == rb_funcall( v, rb_intern( "seed" ), 0 ) ) ) ? Qtrue : Qfalse ;
+}
+
 void Init_ext() {
   CryptModule = rb_define_module( "Crypt" );
   Xorshift64StarClass = rb_define_class_under( CryptModule, "Xorshift64Star", rb_cObject );
@@ -103,4 +116,6 @@ void Init_ext() {
   rb_define_method( Xorshift64StarClass, "srand", Xorshift64Star_srand, -2 );
   rb_define_method( Xorshift64StarClass, "rand", Xorshift64Star_rand, -2 );
   rb_define_method( Xorshift64StarClass, "new_seed", Xorshift64Star_new_seed, 0 );
+  rb_define_method( Xorshift64StarClass, "seed", Xorshift64Star_seed, 0 );
+  rb_define_method( Xorshift64StarClass, "==", Xorshift64Star_eq, 1 );
 }

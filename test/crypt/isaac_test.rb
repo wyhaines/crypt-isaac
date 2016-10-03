@@ -1,4 +1,4 @@
-require 'test_helper'
+require 'test_isaac_helper'
 require 'benchmark'
 
 describe Crypt::ISAAC do
@@ -20,9 +20,9 @@ describe Crypt::ISAAC do
     mynum.must_be :<, 1
   end
 
-  it "generates floats when called with a float argument" do
+  it "generates integers even when called with a float argument" do
     mynum = @generator.rand(10.0)
-    mynum.must_be_kind_of Float
+    mynum.must_be_kind_of Integer
     mynum.must_be :>=, 0
     mynum.must_be :<, 10
   end
