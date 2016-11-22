@@ -8,8 +8,9 @@ module Crypt
     UINT64_Cf = UINT64_C.to_f
 
     def initialize( seed = new_seed )
+      @seed = nil
       srand( seed )
-      @old_seed = @seed
+      @old_seed = seed
     end
 
     def new_seed

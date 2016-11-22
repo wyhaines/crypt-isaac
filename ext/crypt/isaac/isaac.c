@@ -3,6 +3,71 @@
 
 static VALUE CryptModule;
 static VALUE ISAACClass;
+static VALUE DEFAULT;
+
+static VALUE ISAAC_class_new_seed( VALUE self, VALUE args ) {
+  int x;
+  long len = RARRAY_LEN( args );
+  size_t nread;
+  uint32_t num = 0;
+  FILE *fh;
+  VALUE _seed;
+  VALUE seed_prng;
+  VALUE random_argv[1];
+  VALUE rnd_source = Qnil;
+  VALUE new_seed = rb_ary_new();
+  VALUE zero = INT2NUM( 0 );
+
+  for (x = RANDSIZ - 1; x >= 0; x--) { rb_ary_push( new_seed, zero ); }
+
+  if ( len == 0 ) {
+    _seed = Qtrue;
+  } else {
+    _seed = rb_ary_entry( args, 0 );
+  }
+
+  if ( ( _seed == Qtrue ) || ( _seed == Qfalse ) ) {
+    rnd_source = ( _seed == Qtrue ) ? rb_str_new2("/dev/urandom") : rb_str_new2("/dev/random");
+  }
+
+  if ( rb_funcall( _seed, rb_intern( "respond_to?" ), 1, ID2SYM( rb_intern("each") ) ) == Qtrue ) {
+    for (
+      x = ( NUM2INT( rb_funcall( _seed, rb_intern( "length" ), 0, NULL ) ) > (RANDSIZ - 1) ?
+          ( RANDSIZ - 1 ) : NUM2INT( rb_funcall( _seed, rb_intern( "length" ), 0, NULL ) ) );
+      x >= 0;
+      x--
+    ) {
+      rb_ary_store( new_seed, x, rb_ary_entry( _seed, x ) );
+    }
+  } else if ( ( rnd_source != Qnil ) && ( rb_funcall( rb_mFileTest, rb_intern("exist?"), 1, rnd_source ) == Qtrue ) ) {
+    fh = fopen("/dev/urandom","r");
+    for ( x = RANDSIZ - 1; x >= 0; x-- ) {
+      nread = fread(&num, sizeof(uint32_t), 1, fh);
+      if ( nread == 0 ) {
+        x++;
+        continue;
+      }
+      rb_ary_store( new_seed, x, LONG2NUM(num) );
+    }
+    fclose(fh);
+  } else {
+    if ( rnd_source != Qnil ) {
+      _seed = Qnil;
+    }
+    if ( rb_funcall( _seed, rb_intern( "respond_to?" ), 1, ID2SYM( rb_intern("rand") ) ) == Qtrue ) {
+      seed_prng = _seed;
+    } else {
+      random_argv[0] = _seed;
+      seed_prng = rb_class_new_instance( 1, random_argv, rb_const_get( rb_const_get( rb_cObject, rb_intern( "Crypt" ) ), rb_intern( "Xorshift64Star" ) ) );
+      _seed = rb_funcall( seed_prng, rb_intern( "seed" ), 0 );
+    }
+    for ( x = RANDSIZ - 1; x >= 0; x-- ) {
+      rb_ary_store( new_seed, x, rb_funcall( seed_prng, rb_intern( "rand" ), 1, ULONG2NUM(4294967296) ) );
+    }
+  }
+
+  return new_seed;
+}
 
 static void ISAAC_free( randctx* ctx ) {
   if ( ctx ) {
@@ -17,29 +82,46 @@ static VALUE ISAAC_alloc( VALUE klass ) {
 }
 
 static VALUE ISAAC_initialize( VALUE self, VALUE args ) {
-  VALUE _seed ;
   long len = RARRAY_LEN( args );
+  VALUE _seed ;
+
   if ( len == 0 ) {
     _seed = Qtrue;
   } else {
     _seed = rb_ary_entry( args, 0 );
   }
 
+  rb_iv_set( self, "@seed", Qnil );
   return rb_funcall( self, rb_intern( "srand" ), 1, _seed );
 }
 
+static VALUE ISAAC_copy( VALUE self, VALUE from ) {
+  int x;
+  randctx *self_ctx;
+  randctx *from_ctx;
+
+  Data_Get_Struct( self, randctx, self_ctx );
+  Data_Get_Struct( from, randctx, from_ctx );
+  
+  self_ctx->randcnt = from_ctx->randcnt;
+  self_ctx->randa = from_ctx->randa;
+  self_ctx->randb = from_ctx->randb;
+  self_ctx->randc = from_ctx->randc;
+  for ( x = RANDSIZ - 1; x >= 0; x-- ) {
+    self_ctx->randrsl[x] = from_ctx->randrsl[x];
+    self_ctx->randmem[x] = from_ctx->randmem[x];
+  }
+
+  return self;
+}
+
 static VALUE ISAAC_srand( VALUE self, VALUE args ) {
-  FILE *fh;
-  uint32_t num = 0;
-  size_t nread;
-  VALUE _seed;
-  VALUE old_seed;
-  VALUE seed_prng;
-  VALUE random_argv[1];
-  VALUE rnd_source = Qnil;
   int x;
   long len = RARRAY_LEN( args );
   randctx *ctx;
+  VALUE new_seed;
+  VALUE old_seed;
+  VALUE _seed;
 
   if ( len == 0 ) {
     _seed = Qtrue;
@@ -47,57 +129,33 @@ static VALUE ISAAC_srand( VALUE self, VALUE args ) {
     _seed = rb_ary_entry( args, 0 );
   }
 
-  if ( ( _seed == Qtrue ) || ( _seed == Qfalse ) ) {
-    rnd_source = ( _seed == Qtrue ) ? rb_str_new2("/dev/urandom") : rb_str_new2("/dev/random");
-  }
+  new_seed = rb_funcall( rb_obj_class( self ), rb_intern( "new_seed" ), 1, _seed );
+  old_seed = rb_iv_get( self, "@seed");
+  rb_iv_set( self, "@seed", rb_ary_dup( new_seed ) );
 
   Data_Get_Struct( self, randctx, ctx );
   MEMZERO( ctx, randctx, 1 );
-
-  if ( ( rnd_source != Qnil ) && ( rb_funcall( rb_mFileTest, rb_intern("exist?"), 1, rnd_source ) == Qtrue ) ) {
-    fh = fopen("/dev/urandom","r");
-    for ( x = RANDSIZ - 1; x >= 0; x-- ) {
-      nread = fread(&num, sizeof(uint32_t), 1, fh);
-      if ( nread == 0 ) {
-        x++;
-        continue;
-      }
-      ctx->randrsl[x] = num;
-    }
-    fclose(fh);
-  } else {
-    if ( rnd_source != Qnil ) {
-      _seed = Qnil;
-    }
-    if ( rb_funcall( _seed, rb_intern( "respond_to?" ), 1, rb_str_new2("rand") ) == Qtrue ) {
-      seed_prng = _seed;
-    } else {
-      random_argv[0] = _seed;
-      seed_prng = rb_class_new_instance( 1, random_argv, rb_const_get( rb_const_get( rb_cObject, rb_intern( "Crypt" ) ), rb_intern( "Xorshift64Star" ) ) );
-      _seed = rb_funcall( seed_prng, rb_intern( "seed" ), 0 );
-      rb_iv_set( self, "@seed_prng", seed_prng );
-    }
-    for ( x = RANDSIZ - 1; x >= 0; x-- ) {
-      ctx->randrsl[x] = FIX2ULONG( rb_funcall( seed_prng, rb_intern( "rand" ), 1, ULONG2NUM(4294967296) ) );
-    }
+  for ( x = RANDSIZ - 1; x >= 0; x-- ) {
+    ctx->randrsl[x] = FIX2ULONG( rb_ary_entry( new_seed, x ) );
   }
   randinit(ctx, 1);
-
-  rb_iv_set( self, "@seed", ( ( rnd_source == Qtrue ) || ( rnd_source == Qfalse ) ) ? rnd_source : _seed );
-  old_seed = rb_iv_get( self, "@seed");
 
   return old_seed;
 }
 
+static VALUE ISAAC_class_srand( VALUE self, VALUE args) {
+  return ISAAC_srand( DEFAULT, args );
+}
+
 static VALUE ISAAC_rand( VALUE self, VALUE args ) {
-  uint32_t limit;
   long len = RARRAY_LEN( args );
-  VALUE arg;
   short arg_is_a_range = 0;
-  ID id_min;
-  VALUE val_min = 0;
-  ID id_max;
+  uint32_t limit;
   randctx *ctx;
+  ID id_max;
+  ID id_min;
+  VALUE arg;
+  VALUE val_min = 0;
 
   arg = rb_ary_entry( args, 0 );
 
@@ -128,10 +186,14 @@ static VALUE ISAAC_rand( VALUE self, VALUE args ) {
   }
 }
 
+static VALUE ISAAC_class_rand( VALUE self, VALUE args) {
+  return ISAAC_rand( DEFAULT, args );
+}
+
 static VALUE ISAAC_marshal_dump( VALUE self ) {
-  randctx *ctx;
-  int i;
   int ary_size = sizeof( randctx ) / sizeof( ub4 );
+  int i;
+  randctx *ctx;
   VALUE ary;
 
   Data_Get_Struct( self, randctx, ctx );
@@ -145,9 +207,9 @@ static VALUE ISAAC_marshal_dump( VALUE self ) {
 }
 
 static VALUE ISAAC_marshal_load( VALUE self, VALUE ary ) {
-  randctx *ctx;
-  int i;
   int ary_size = sizeof( randctx ) / sizeof( ub4 );
+  int i;
+  randctx *ctx;
 
   Data_Get_Struct( self, randctx, ctx );
 
@@ -165,12 +227,9 @@ static VALUE ISAAC_seed( VALUE self ) {
   return rb_iv_get( self, "@seed");
 }
 
-static VALUE ISAAC_new_seed( VALUE self ) {
-  return rb_funcall( rb_iv_get( self, "@seed_prng" ), rb_intern("new_seed"), 0 );
-}
-
 int compare_ctx( randctx* ctx1, randctx* ctx2 ) {
   int x;
+
   for ( x = RANDSIZ - 1; x >= 0; x-- ) {
     if ( ctx1->randrsl[x] != ctx2->randrsl[x] ) return 0;
   }
@@ -202,7 +261,6 @@ static VALUE ISAAC_bytes( VALUE self, VALUE count ) {
       ctx->randcnt = RANDSIZ - 1;
     }
 
-    // snprintf( &buf[ i ], 5, "%lu", ctx->randrsl[ctx->randcnt] ); 
     buf[ i ] = ctx->randrsl[ctx->randcnt];
     buf[ i + 1 ] = ctx->randrsl[ctx->randcnt] >> 8;
     buf[ i + 2 ] = ctx->randrsl[ctx->randcnt] >> 16;
@@ -215,18 +273,25 @@ static VALUE ISAAC_bytes( VALUE self, VALUE count ) {
 void Init_ext() {
   CryptModule = rb_define_module( "Crypt" );
   ISAACClass = rb_define_class_under( CryptModule, "ISAAC", rb_cObject );
-        
+  
+  rb_define_singleton_method( ISAACClass, "rand", ISAAC_class_rand, -2 );
+  rb_define_singleton_method( ISAACClass, "srand", ISAAC_class_srand, -2 );
+  rb_define_singleton_method( ISAACClass, "new_seed", ISAAC_class_new_seed, -2 );
+
   rb_define_alloc_func( ISAACClass, ISAAC_alloc );
   rb_define_method( ISAACClass, "initialize", ISAAC_initialize, -2 );
   rb_define_method( ISAACClass, "srand", ISAAC_srand, -2 );
   rb_define_method( ISAACClass, "rand", ISAAC_rand, -2 );
   rb_define_method( ISAACClass, "seed", ISAAC_seed, 0 );
-  rb_define_method( ISAACClass, "new_seed", ISAAC_new_seed, 0 );
   rb_define_method( ISAACClass, "==", ISAAC_eq, 1 );
   rb_define_method( ISAACClass, "bytes", ISAAC_bytes, 1 );
-  rb_define_method( ISAACClass, "marshal_dump", ISAAC_marshal_dump, 0 );
-  rb_define_method( ISAACClass, "marshal_load", ISAAC_marshal_load, 1 );
+  rb_define_method( ISAACClass, "initialize_copy", ISAAC_copy, 1 );
+  rb_define_private_method( ISAACClass, "marshal_dump", ISAAC_marshal_dump, 0 );
+  rb_define_private_method( ISAACClass, "marshal_load", ISAAC_marshal_load, 1 );
     
-  rb_const_set( ISAACClass, rb_intern("RANDSIZ"), ULONG2NUM(RANDSIZ) );
+  rb_const_set( ISAACClass, rb_intern( "RANDSIZ" ), ULONG2NUM(RANDSIZ) );
+  rb_const_set( ISAACClass, rb_intern( "DEFAULT" ), rb_class_new_instance( 0, 0, ISAACClass ) );
+  DEFAULT = rb_const_get( ISAACClass, rb_intern( "DEFAULT" ) );
+
   rb_require( "crypt/isaac/version.rb" );
 }

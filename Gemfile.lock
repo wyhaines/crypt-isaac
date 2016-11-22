@@ -1,0 +1,22 @@
+PATH
+  remote: .
+  specs:
+    crypt-isaac (1.2.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    minitest
+    rake (11.3.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  bundler (~> 1.10)
+  crypt-isaac!
+  minitest (> 0)
+  rake (~> 11.0)
+
+BUNDLED WITH
+   1.13.1

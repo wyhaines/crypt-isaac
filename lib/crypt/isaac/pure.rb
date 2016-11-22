@@ -25,32 +25,31 @@ module Crypt
     # xorshift* generator, but anything that responds to #rand can be passed
     # as a seed.
 
-    def initialize(seed = true)
-      @mm = []
-
-      self.srand( seed )
+    def self.rand( arg = nil )
+      DEFAULT.rand( arg )
     end
 
-    # If seeded with an integer, use that to seed a standard Ruby Mersenne Twister
-    # PRNG, and then use that to generate seed value for ISAAC. This is mostly useful
-    # for producing repeated, deterministic results, which may be needed for testing.
-    def srand(seed = true)
+    def self.srand( seed = true )
+      DEFAULT.srand( seed )
+    end
+
+    def self.new_seed( seed = true )
+      seed_array = Array.new( 256,  0)
       rnd_source = nil
       rnd_source = seed ? '/dev/urandom' : '/dev/random' if ( ( seed == true ) || ( seed == false ) )
-      if rnd_source && ( FileTest.exist? rnd_source )
-        @randrsl = []
+      if ( seed.respond_to?(:each) )
+        ( seed.length > 255 ? 256 : seed.length ).times {|s| seed_array[s] = seed[s] }
+      elsif rnd_source && ( FileTest.exist? rnd_source )
         File.open( rnd_source, 'r' ) do |r|
           256.times do |t|
             z = r.read(4)
             x = z.unpack('V')[0]
-            @randrsl[t] = x
+            seed_array[t] = x
           end
         end
-        randinit( true )
       else
         seed = nil if rnd_source
 
-        @randrsl = []
         if seed.respond_to?( :rand )
           seed_prng = seed
         else
@@ -58,10 +57,37 @@ module Crypt
         end
 
         256.times do |t|
-          @randrsl[t] = seed_prng.rand(4294967296)
+          seed_array[t] = seed_prng.rand(4294967296)
         end
-        randinit(true)
       end
+      seed_array
+    end
+
+    def initialize(seed = true)
+      @mm = []
+
+      self.srand( seed )
+    end
+
+    def initialize_copy( from )
+      @aa = from.aa
+      @bb = from.bb
+      @cc = from.cc
+      @mm = from.mm.dup
+      @randcnt = from.randcnt
+      @randrsl = from.randrsl.dup
+
+      self
+    end
+
+    # If seeded with an integer, use that to seed a standard Ruby Mersenne Twister
+    # PRNG, and then use that to generate seed value for ISAAC. This is mostly useful
+    # for producing repeated, deterministic results, which may be needed for testing.
+    def srand(seed = true)
+      @randrsl = self.class.new_seed( seed )
+      @seed = @randrsl.dup
+      randinit(true)
+      @seed
     end
 
     # Works just like the standard rand() function.  If called with an
@@ -78,17 +104,17 @@ module Crypt
       @randcnt -= 1
       if arg.nil?
         ( @randrsl[@randcnt] / 536870912.0 ) % 1
-      elsif Integer === arg || Float === arg
+      elsif Integer === arg
         @randrsl[@randcnt] % arg
       elsif Range === arg
         arg.min + @randrsl[@randcnt] % (arg.max - arg.min)
       else
-        @randrsl[@randcnt] % Integer(arg)
+        @randrsl[@randcnt] % arg.to_i
       end
     end
 
     def seed
-      @seed.respond_to?(:seed) ? @seed.seed : @seed
+      @seed
     end
 
     def state
@@ -117,7 +143,7 @@ module Crypt
 
       @cc += 1
       @bb += @cc
-      @bb & 0xffffffff
+      @bb = @bb & 0xffffffff
 
       while (i < 256) do
         x = @mm[i]
@@ -214,5 +240,9 @@ module Crypt
       isaac()
       @randcnt=256;        # /* prepare to use the first set of results */
     end
+
+    DEFAULT = ISAAC.new
+
+
   end
 end
