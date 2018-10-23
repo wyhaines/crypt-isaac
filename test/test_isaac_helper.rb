@@ -1,4 +1,6 @@
-$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 if ENV['isaac_library_type'] == 'ext'
   require 'crypt/isaac/ext'
   require 'crypt/isaac/xorshift/ext'

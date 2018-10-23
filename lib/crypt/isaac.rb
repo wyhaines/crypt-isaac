@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 begin
   require 'crypt/isaac/ext'
 rescue LoadError
@@ -13,4 +15,3 @@ rescue LoadError
   # Fallback on an internal micro-implementation.
   require 'crypt/isaac/xorshift'
 end
-

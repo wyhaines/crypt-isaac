@@ -1,4 +1,5 @@
-$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
-require 'crypt/isaac/xorshift'
+# frozen_string_literal: true
 
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
+require 'crypt/isaac/xorshift'
 require 'minitest/autorun'

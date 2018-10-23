@@ -1,38 +1,48 @@
-# A pure Ruby micro-implementation. Use crypt-xorshift if you want a complete implementation.
+# frozen_string_literal: true
+
+require 'english'
 
 module Crypt
+  # A pure Ruby micro-implementation. Use crypt-xorshift if you want
+  # a complete implementation.
   class Xorshift64Star
-
     UINT32_C = 2**32
     UINT64_C = 2**64
     UINT64_Cf = UINT64_C.to_f
 
-    def initialize( seed = new_seed )
+    @counter = 0
+    class << self
+      attr_accessor :counter
+    end
+
+    def initialize(seed = new_seed)
       @seed = nil
-      srand( seed )
+      srand(seed)
       @old_seed = seed
     end
 
     def new_seed
       n = Time.now
-      @@counter ||= 0
-      @@counter += 1
-      [n.usec % 65536, n.to_i % 65536, $$ ^ 65536, @@counter % 65536 ].collect {|x| x.to_s(16)}.join.to_i(16)
+      Xorshift64Star.counter += 1
+      [n.usec % 65_536,
+       n.to_i % 65_536,
+       $PROCESS_ID ^ 65_536,
+       Xorshift64Star.counter % 65_536].collect { |x| x.to_s(16) }.join.to_i(16)
     end
 
-    def srand( seed = new_seed )
+    def srand(seed = new_seed)
       @old_seed = @seed
       @seed = seed % UINT64_C
     end
 
-    def rand( n = 0)
+    def rand(num = 0)
       @seed ^= @seed >> 12
       @seed ^= @seed << 25
       @seed ^= @seed >> 27
-      if n < 1
-        ( ( @seed * 2685821657736338717 ) % UINT64_C ) / UINT64_Cf
+      if num < 1
+        ((@seed * 2_685_821_657_736_338_717) % UINT64_C) / UINT64_Cf
       else
-        ( ( @seed * 2685821657736338717 ) % UINT64_C ) % Integer( n )
+        ((@seed * 2_685_821_657_736_338_717) % UINT64_C) % Integer(num)
       end
     end
 
@@ -40,9 +50,8 @@ module Crypt
       @old_seed
     end
 
-    def ==(v)
-      self.class == v.class && @old_seed == v.seed
+    def ==(other)
+      self.class == other.class && @old_seed == other.seed
     end
-
   end
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 ENV['isaac_library_type'] = 'ext'
 child = fork do
   puts "\n*****\nTesting Crypt::ISAAC C extension implementation\n*****\n\n"
